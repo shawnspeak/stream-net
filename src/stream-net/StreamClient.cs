@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 
 namespace Stream
 {
-    public class StreamClient
+    public class StreamClient : IDisposable
     {
         internal const string BaseUrlFormat = "https://{0}-api.stream-io-api.com";
         internal const string BaseUrlPath = "/api/v1.0/";
@@ -16,7 +16,7 @@ namespace Stream
         internal const int ActivityCopyLimitDefault = 300;
         internal const int ActivityCopyLimitMax = 1000;
 
-        readonly RestClient _client;
+        private RestClient _restClient;
         readonly StreamClientOptions _options;
         readonly string _apiSecret;
         readonly string _apiKey;
@@ -31,7 +31,7 @@ namespace Stream
             _apiKey = apiKey;
             _apiSecret = apiSecret;
             _options = options ?? StreamClientOptions.Default;
-            _client = new RestClient(GetBaseUrl(), TimeSpan.FromMilliseconds(_options.Timeout));
+            _restClient = new RestClient(GetBaseUrl(), TimeSpan.FromMilliseconds(_options.Timeout));
         }
 
         /// <summary>
@@ -126,7 +126,7 @@ namespace Stream
 
         internal Task<RestResponse> MakeRequest(RestRequest request)
         {
-            return _client.Execute(request);
+            return _restClient.Execute(request);
         }
 
         private static string Base64UrlEncode(byte[] input)
@@ -194,6 +194,24 @@ namespace Stream
             string[] bits = to.Split(':');
             var otherFeed = this.Feed(bits[0], bits[1]);
             return to + " " + otherFeed.Token;
+        }
+
+        public void Dispose()
+        {
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+
+        protected virtual void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                if (_restClient != null)
+                {
+                    _restClient.Dispose();
+                    _restClient = null;
+                }
+            }
         }
     }
 }

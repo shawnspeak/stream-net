@@ -6,69 +6,30 @@ using System.Threading.Tasks;
 
 namespace Stream.Rest
 {
-    internal class RestClient
+    internal class RestClient : IDisposable
     {
         readonly Uri _baseUrl;
         private TimeSpan _timeout;
+        private HttpClient _httpClient;
 
         public RestClient(Uri baseUrl, TimeSpan timeout)
         {
             _baseUrl = baseUrl;
             _timeout = timeout;
-        }
 
-        private HttpClient BuildClient(RestRequest request)
+            _httpClient = new HttpClient();
+
+            _httpClient.DefaultRequestHeaders.Accept.Clear();
+            _httpClient.DefaultRequestHeaders.Accept.Add(new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("application/json"));
+            _httpClient.Timeout = _timeout;
+        }     
+
+        private HttpClient GetClient()
         {
 #if NET45
             ServicePointManager.SecurityProtocol = SecurityProtocolType.Ssl3 | SecurityProtocolType.Tls | SecurityProtocolType.Tls11 | SecurityProtocolType.Tls12;
 #endif
-            var client = new HttpClient();
-            
-            client.DefaultRequestHeaders.Accept.Clear();
-            client.DefaultRequestHeaders.Accept.Add(new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("application/json"));
-
-            client.Timeout = _timeout;
-
-            // add request headers
-            request.Headers.ForEach(h =>
-            {
-                client.DefaultRequestHeaders.Add(h.Key, h.Value);
-            });
-
-            return client;
-        }
-
-        public TimeSpan Timeout
-        {
-            get { return _timeout; }
-            set { _timeout = value; }
-        }
-
-        private async Task<RestResponse> ExecuteGet(Uri url, RestRequest request)
-        {
-            using (var client = BuildClient(request))
-            {
-                HttpResponseMessage response = await client.GetAsync(url);
-                return await RestResponse.FromResponseMessage(response);
-            }
-        }
-
-        private async Task<RestResponse> ExecutePost(Uri url, RestRequest request)
-        {
-            using (var client = BuildClient(request))
-            {
-                HttpResponseMessage response = await client.PostAsync(url, new StringContent(request.JsonBody, Encoding.UTF8, "application/json"));
-                return await RestResponse.FromResponseMessage(response);
-            }
-        }
-
-        private async Task<RestResponse> ExecuteDelete(Uri url, RestRequest request)
-        {
-            using (var client = BuildClient(request))
-            {
-                HttpResponseMessage response = await client.DeleteAsync(url);
-                return await RestResponse.FromResponseMessage(response);
-            }
+            return _httpClient;
         }
 
         private Uri BuildUri(RestRequest request)
@@ -82,21 +43,59 @@ namespace Stream.Rest
             return new Uri(_baseUrl, request.Resource + queryString);
         }
 
-        public Task<RestResponse> Execute(RestRequest request)
+        public async Task<RestResponse> Execute(RestRequest request)
         {
             if (request == null)
                 throw new ArgumentNullException("request", "Request is required");
 
-            Uri url = this.BuildUri(request);
+            var client = GetClient();
 
+            var httpRequest = new HttpRequestMessage()
+            {
+                RequestUri = BuildUri(request)
+            };
+
+            // setup method and content if needed
             switch (request.Method)
             {
                 case HttpMethod.DELETE:
-                    return this.ExecuteDelete(url, request);
-                case HttpMethod.POST:
-                    return this.ExecutePost(url, request);
+                    httpRequest.Method = System.Net.Http.HttpMethod.Delete;
+                    break;
+                case HttpMethod.POST:                    
+                    httpRequest.Method = System.Net.Http.HttpMethod.Post;
+                    httpRequest.Content = new StringContent(request.JsonBody, Encoding.UTF8, "application/json");
+                    break;                    
                 default:
-                    return this.ExecuteGet(url, request);
+                    httpRequest.Method = System.Net.Http.HttpMethod.Get;
+                    break;
+            }
+
+            // add request headers
+            httpRequest.Headers.Clear();
+            request.Headers.ForEach(h =>
+            {
+                httpRequest.Headers.Add(h.Key, h.Value);
+            });
+
+            HttpResponseMessage response = await client.SendAsync(httpRequest);
+            return await RestResponse.FromResponseMessage(response);
+        }              
+
+        public void Dispose()
+        {
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+
+        protected virtual void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                if (_httpClient != null)
+                {
+                    _httpClient.Dispose();
+                    _httpClient = null;
+                }
             }
         }
     }

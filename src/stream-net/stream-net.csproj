@@ -7,12 +7,12 @@
   </PropertyGroup>
   <PropertyGroup>
     <PackageId>stream-net</PackageId>
-    <Version>2.0.3</Version>
-    <PackageVersion>2.0.3</PackageVersion>
+    <Version>2.1.0</Version>
+    <PackageVersion>2.1.0</PackageVersion>
     <Authors>Shawn Beach</Authors>
     <Description>A library for building newsfeed and activity stream applications with http://getstream.io</Description>
     <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
-    <PackageReleaseNotes>Added another target framework. Ignoring the Follower.UpdatedAt value.</PackageReleaseNotes>
+    <PackageReleaseNotes>StreamClient now implements IDisposable and holds a reference to HttpClient. A single instance of StreamClient should be used with a given process</PackageReleaseNotes>
     <Copyright>Copyright 2018</Copyright>
     <PackageProjectUrl>https://github.com/shawnspeak/stream-net</PackageProjectUrl>
     <PackageLicenseUrl>https://github.com/shawnspeak/stream-net/blob/master/LICENSE</PackageLicenseUrl>
